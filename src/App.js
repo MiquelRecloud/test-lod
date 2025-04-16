@@ -34,30 +34,40 @@ function App() {
 
         // Load the plys
         const loader = new PLYLoader()
-        const lod = new THREE.LOD()
 
-        loader.load(`${process.env.PUBLIC_URL}/low.ply`, (geometry) => {
-            geometry.computeVertexNormals()
-            const material = new THREE.PointsMaterial({
-                size: 0.05,
-                vertexColors: true,
+        fetch(`${process.env.PUBLIC_URL}/low/list.json`)
+            .then((res) => res.json())
+            .then((files) => {
+                files.forEach(({ filename, position }) => {
+                    const lod = new THREE.LOD()
+
+                    loader.load(`${process.env.PUBLIC_URL}/low/${filename}`, (geometry) => {
+                        geometry.computeVertexNormals()
+                        const material = new THREE.PointsMaterial({
+                            size: 0.05,
+                            vertexColors: true,
+                        })
+                        const lowResPcd = new THREE.Points(geometry, material)
+                        lod.addLevel(lowResPcd, 30)
+                    })
+
+                    loader.load(`${process.env.PUBLIC_URL}/high/${filename}`, (geometry) => {
+                        geometry.computeVertexNormals()
+                        const material = new THREE.PointsMaterial({
+                            size: 0.05,
+                            vertexColors: true,
+                        })
+                        const highResPcd = new THREE.Points(geometry, material)
+                        lod.addLevel(highResPcd, 0)
+                        renderer.render(scene, camera)
+                    })
+
+                    // Set position of LOD object
+                    lod.position.set(position[0], position[1], position[2])
+
+                    scene.add(lod)
+                })
             })
-            const lowResPcd = new THREE.Points(geometry, material)
-            lod.addLevel(lowResPcd, 30)
-        })
-
-        loader.load(`${process.env.PUBLIC_URL}/high.ply`, (geometry) => {
-            geometry.computeVertexNormals()
-            const material = new THREE.PointsMaterial({
-                size: 0.05,
-                vertexColors: true,
-            })
-            const highResPcd = new THREE.Points(geometry, material)
-            lod.addLevel(highResPcd, 0)
-            renderer.render(scene, camera)
-        })
-
-        scene.add(lod)
 
         return () => {
             mountRef.current.removeChild(renderer.domElement)
