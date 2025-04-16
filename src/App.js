@@ -48,7 +48,7 @@ function App() {
                             vertexColors: true,
                         })
                         const lowResPcd = new THREE.Points(geometry, material)
-                        lod.addLevel(lowResPcd, 30)
+                        lod.addLevel(lowResPcd, 15)
                     })
 
                     loader.load(`${process.env.PUBLIC_URL}/high/${filename}`, (geometry) => {
