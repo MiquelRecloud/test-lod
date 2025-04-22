@@ -13,7 +13,7 @@ function App() {
 
         // Camera
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
-        camera.position.set(0, 20, 40)
+        camera.position.set(0, 0, 1)
 
         // Renderer
         const renderer = new THREE.WebGLRenderer({ antialias: true })
@@ -32,25 +32,36 @@ function App() {
 
         renderer.render(scene, camera)
 
-        // Load the plys
+        // Load the low resolution PCD
         const loader = new PLYLoader()
+        loader.load(`${process.env.PUBLIC_URL}/low.ply`, (geometry) => {
+            geometry.computeVertexNormals()
+            const material = new THREE.PointsMaterial({
+                size: 0.05,
+                vertexColors: true,
+            })
+            const highResPcd = new THREE.Points(geometry, material)
+            scene.add(highResPcd)
+            renderer.render(scene, camera)
+            console.log('Loaded and centered high res PCD')
+        })
 
-        fetch(`${process.env.PUBLIC_URL}/low/list.json`)
+        fetch(`${process.env.PUBLIC_URL}/high/list.json`)
             .then((res) => res.json())
             .then((files) => {
                 files.forEach(({ filename, position }) => {
                     const lod = new THREE.LOD()
 
-                    loader.load(`${process.env.PUBLIC_URL}/low/${filename}`, (geometry) => {
-                        geometry.computeVertexNormals()
-                        const material = new THREE.PointsMaterial({
-                            size: 0.05,
-                            vertexColors: true,
-                        })
-                        const lowResPcd = new THREE.Points(geometry, material)
-                        lod.addLevel(lowResPcd, 15)
+                    // Load an empty point cloud for the low resolution
+                    const emptyGeometry = new THREE.BufferGeometry()
+                    const emptyMaterial = new THREE.PointsMaterial({
+                        size: 0.05,
+                        vertexColors: true,
                     })
+                    const emptyPcd = new THREE.Points(emptyGeometry, emptyMaterial)
+                    lod.addLevel(emptyPcd, 5)
 
+                    // Load the high resolution PCD part
                     loader.load(`${process.env.PUBLIC_URL}/high/${filename}`, (geometry) => {
                         geometry.computeVertexNormals()
                         const material = new THREE.PointsMaterial({

@@ -42,8 +42,8 @@ def split_pointcloud_by_cubes(input_ply, output_dir, cube_size):
         json.dump(file_names, json_file)
 
 if __name__ == "__main__":
-    input_ply = "public/low.ply"
-    output_dir = "public/low"
-    cube_size = 2.0
+    input_ply = "public/high.ply"
+    output_dir = "public/high"
+    cube_size = 1.0
 
     split_pointcloud_by_cubes(input_ply, output_dir, cube_size)
