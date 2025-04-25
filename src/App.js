@@ -45,39 +45,66 @@ function App() {
             renderer.render(scene, camera)
             console.log('Loaded and centered high res PCD')
         })
-
         fetch(`${process.env.PUBLIC_URL}/high/list.json`)
             .then((res) => res.json())
             .then((files) => {
-                files.forEach(({ filename, position }) => {
-                    const lod = new THREE.LOD()
+                const maxConcurrentLoads = 1
+                let activeLoads = 0
+                let index = 0
 
-                    // Load an empty point cloud for the low resolution
-                    const emptyGeometry = new THREE.BufferGeometry()
-                    const emptyMaterial = new THREE.PointsMaterial({
-                        size: 0.05,
-                        vertexColors: true,
-                    })
-                    const emptyPcd = new THREE.Points(emptyGeometry, emptyMaterial)
-                    lod.addLevel(emptyPcd, 5)
+                const loadNext = () => {
+                    if (index >= files.length) return
 
-                    // Load the high resolution PCD part
-                    loader.load(`${process.env.PUBLIC_URL}/high/${filename}`, (geometry) => {
-                        geometry.computeVertexNormals()
-                        const material = new THREE.PointsMaterial({
-                            size: 0.05,
-                            vertexColors: true,
+                    if (activeLoads < maxConcurrentLoads) {
+                        const { filename, position } = files[index++]
+                        activeLoads++
+
+                        // Load the high resolution PCD part
+                        const worker = new Worker(new URL('./plyWorker.js', import.meta.url), { type: 'module' })
+                        worker.postMessage({
+                            fileUrl: `${process.env.PUBLIC_URL}/high/${filename}`,
                         })
-                        const highResPcd = new THREE.Points(geometry, material)
-                        lod.addLevel(highResPcd, 0)
-                        renderer.render(scene, camera)
-                    })
+                        worker.onmessage = (event) => {
+                            const lod = new THREE.LOD()
 
-                    // Set position of LOD object
-                    lod.position.set(position[0], position[1], position[2])
+                            // Load an empty point cloud for the low resolution
+                            const emptyGeometry = new THREE.BufferGeometry()
+                            const emptyMaterial = new THREE.PointsMaterial({
+                                size: 0.05,
+                                vertexColors: true,
+                            })
+                            const emptyPcd = new THREE.Points(emptyGeometry, emptyMaterial)
+                            lod.addLevel(emptyPcd, 5)
 
-                    scene.add(lod)
-                })
+                            const { vertices } = event.data
+
+                            // Create a buffer geometry and set the position attribute
+                            let bufferGeometry = new THREE.BufferGeometry()
+                            bufferGeometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
+
+                            const material = new THREE.PointsMaterial({
+                                size: 0.05,
+                                vertexColors: true,
+                            })
+                            const highResPcd = new THREE.Points(bufferGeometry, material)
+                            lod.addLevel(highResPcd, 0)
+
+                            // Set position of LOD object
+                            lod.position.set(position[0], position[1], position[2])
+
+                            scene.add(lod)
+                            renderer.render(scene, camera)
+
+                            activeLoads--
+                            loadNext()
+                        }
+                    }
+                }
+
+                // Start loading files
+                for (let i = 0; i < maxConcurrentLoads; i++) {
+                    loadNext()
+                }
             })
 
         return () => {
